@@ -43,30 +43,41 @@ class TaskInclude(Task):
 
     _static = FieldAttribute(isa='bool', default=None)
 
+    def __init__(self, block=None, role=None, task_include=None):
+        super(TaskInclude, self).__init__(block=block, role=role, task_include=task_include)
+        self.statically_loaded = False
+
     @staticmethod
     def load(data, block=None, role=None, task_include=None, variable_manager=None, loader=None):
         t = TaskInclude(block=block, role=role, task_include=task_include)
+        if t.action == 'include_task':
+            t._inheritable = False
         return t.load_data(data, variable_manager=variable_manager, loader=loader)
+
+    def copy(self, exclude_parent=False, exclude_tasks=False):
+        new_me = super(TaskInclude, self).copy(exclude_parent=exclude_parent, exclude_tasks=exclude_tasks)
+        new_me.statically_loaded = self.statically_loaded
+        return new_me
 
     def get_vars(self):
         '''
         We override the parent Task() classes get_vars here because
         we need to include the args of the include into the vars as
-        they are params to the included tasks.
+        they are params to the included tasks. But ONLY for 'include'
         '''
-        all_vars = dict()
-        if self._block:
-            all_vars.update(self._block.get_vars())
-        if self._task_include:
-            all_vars.update(self._task_include.get_vars())
+        if self.action != 'include':
+            all_vars = super(TaskInclude, self).get_vars()
+        else:
+            all_vars = dict()
+            if self._parent:
+                all_vars.update(self._parent.get_vars())
 
-        all_vars.update(self.vars)
-        all_vars.update(self.args)
+            all_vars.update(self.vars)
+            all_vars.update(self.args)
 
-        if 'tags' in all_vars:
-            del all_vars['tags']
-        if 'when' in all_vars:
-            del all_vars['when']
+            if 'tags' in all_vars:
+                del all_vars['tags']
+            if 'when' in all_vars:
+                del all_vars['when']
 
         return all_vars
-
